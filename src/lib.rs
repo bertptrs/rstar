@@ -78,7 +78,7 @@ impl V7Header {
             mode: parse_octal(&block[100..108])?,
             owner: parse_octal(&block[108..116])?,
             group: parse_octal(&block[108..116])?,
-            size: parse_size(&block[124..136]),
+            size: parse_size(&block[124..136])?,
             mtime: parse_octal(&block[136..148])?,
             link: LinkType::from_byte(block[156]),
             link_name: trimmed_str(&block[157..257]).map(|x| x.to_owned()),
