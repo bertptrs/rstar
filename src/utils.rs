@@ -1,9 +1,11 @@
+use std::ffi::OsStr;
+use std::num::ParseIntError;
+use std::os::unix::ffi::OsStrExt;
 use std::str;
 use std::usize;
 
 use itertools::Itertools;
 use num::Num;
-use std::num::ParseIntError;
 
 /// Create an &str from a null-terminated string.
 ///
@@ -16,6 +18,17 @@ pub fn trimmed_str(contents: &[u8]) -> Option<&str> {
             Some((0, _)) => None,
             Some((pos, _)) => str::from_utf8(&contents[..pos]).ok(),
             None => None,
+        }
+    }
+}
+
+pub fn trimmed_osstr(contents: &[u8]) -> Option<&OsStr> {
+    if contents.is_empty() {
+        None
+    } else {
+        match contents.iter().find_position(|&&x| x == 0u8) {
+            Some((pos, _)) if pos != 0 => Some(OsStr::from_bytes(&contents[..pos])),
+            _ => None
         }
     }
 }

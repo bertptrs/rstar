@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::ffi::OsString;
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -6,9 +7,11 @@ use std::num::ParseIntError;
 
 use utils::parse_octal;
 use utils::parse_size;
-use utils::trimmed_str;
+use crate::utils::trimmed_osstr;
 
 mod utils;
+
+type TarBlock = [u8; 512];
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum LinkType {
@@ -60,28 +63,28 @@ impl From<ParseIntError> for TarError {
 }
 
 #[derive(Debug)]
-pub struct V7Header {
-    name: String,
+pub struct TarHeader {
+    name: OsString,
     mode: u32,
     owner: u32,
     group: u32,
     size: usize,
     mtime: u64,
     link: LinkType,
-    link_name: Option<String>,
+    link_name: Option<OsString>,
 }
 
-impl V7Header {
-    pub fn from_block(block: &[u8; 512]) -> Result<V7Header, TarError> {
-        Ok(V7Header {
-            name: trimmed_str(&block[0..100]).ok_or(TarError::EncodingError)?.to_owned(),
+impl TarHeader {
+    pub fn from_v7_header(block: &TarBlock) -> Result<TarHeader, TarError> {
+        Ok(TarHeader {
+            name: trimmed_osstr(&block[0..100]).ok_or(TarError::EncodingError)?.to_owned(),
             mode: parse_octal(&block[100..108])?,
             owner: parse_octal(&block[108..116])?,
             group: parse_octal(&block[108..116])?,
             size: parse_size(&block[124..136])?,
             mtime: parse_octal(&block[136..148])?,
             link: LinkType::from_byte(block[156]),
-            link_name: trimmed_str(&block[157..257]).map(|x| x.to_owned()),
+            link_name: trimmed_osstr(&block[157..257]).map(|x| x.to_owned()),
         })
     }
 }
@@ -98,7 +101,7 @@ mod tests {
         let mut block = [0u8; 512];
         block.copy_from_slice(&SAMPLE_DATA[..512]);
 
-        let header = V7Header::from_block(&block).unwrap();
+        let header = TarHeader::from_v7_header(&block).unwrap();
         assert_eq!(LinkType::Normal, header.link);
     }
 }
