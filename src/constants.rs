@@ -1,7 +1,10 @@
 use std::ops::Range;
 
+/// Size of a single tar block.
+pub const BLOCK_SIZE: usize = 512;
+
 /// Byte array representing a single block in a tar file.
-pub type TarBlock = [u8; 512];
+pub type TarBlock = [u8; BLOCK_SIZE];
 
 /// Definitions for offsets within the tar header format.
 ///

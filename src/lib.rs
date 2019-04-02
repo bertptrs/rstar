@@ -3,14 +3,16 @@ use std::ffi::OsString;
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::mem::{size_of, transmute};
 use std::num::ParseIntError;
 
 use utils::parse_octal;
 use utils::parse_size;
 
-use crate::constants::header::{CHECKSUM_RANGE, NAME_RANGE, MODE_RANGE, OWNER_RANGE, GROUP_RANGE, SIZE_RANGE, MTIME_RANGE, LINK_TYPE_OFFSET, LINK_NAME_RANGE};
-use crate::constants::TarBlock;
+use crate::constants::header::{
+    CHECKSUM_RANGE, GROUP_RANGE, LINK_NAME_RANGE, LINK_TYPE_OFFSET, MODE_RANGE, MTIME_RANGE,
+    NAME_RANGE, OWNER_RANGE, SIZE_RANGE,
+};
+use crate::constants::{TarBlock, BLOCK_SIZE};
 use crate::utils::{compute_checksum, trimmed_osstr};
 
 pub mod constants;
@@ -93,14 +95,16 @@ impl TarHeader {
             true
         } else {
             // Some implementations have the checksum signed, so just try that as well.
-            let signed_block = unsafe { transmute::<_, &[i8; size_of::<TarBlock>()]>(block) };
+            let signed_block = unsafe { &*(block as *const TarBlock as *const [i8; BLOCK_SIZE]) };
             checksum == compute_checksum(signed_block)
         }
     }
 
     pub fn from_v7_header(block: &TarBlock) -> Result<TarHeader, TarError> {
         Ok(TarHeader {
-            name: trimmed_osstr(&block[NAME_RANGE]).ok_or(TarError::EmptyName)?.to_owned(),
+            name: trimmed_osstr(&block[NAME_RANGE])
+                .ok_or(TarError::EmptyName)?
+                .to_owned(),
             mode: parse_octal(&block[MODE_RANGE])?,
             owner: parse_octal(&block[OWNER_RANGE])?,
             group: parse_octal(&block[GROUP_RANGE])?,

@@ -8,6 +8,7 @@ use itertools::Itertools;
 use num::Num;
 
 use crate::constants::header::CHECKSUM_RANGE;
+use crate::constants::BLOCK_SIZE;
 
 /// Create an &str from a null-terminated string.
 ///
@@ -30,13 +31,15 @@ pub fn trimmed_osstr(contents: &[u8]) -> Option<&OsStr> {
     } else {
         match contents.iter().find_position(|&&x| x == 0u8) {
             Some((pos, _)) if pos != 0 => Some(OsStr::from_bytes(&contents[..pos])),
-            _ => None
+            _ => None,
         }
     }
 }
 
 pub fn parse_octal<T>(size: &[u8]) -> Result<T, T::FromStrRadixErr>
-    where T: Num {
+where
+    T: Num,
+{
     T::from_str_radix(trimmed_str(size).unwrap_or(""), 8)
 }
 
@@ -53,10 +56,12 @@ pub fn parse_size(size: &[u8]) -> Result<usize, ParseIntError> {
 ///
 /// While most programs agree that this should be unsigned, it isn't always,
 /// so this function is generic in order to do both.
-pub fn compute_checksum<T>(block: &[T; 512]) -> i32
-    where T: Into<i32> + Copy {
+pub fn compute_checksum<T>(block: &[T; BLOCK_SIZE]) -> i32
+where
+    T: Into<i32> + Copy,
+{
     let checksum_bytes = &block[CHECKSUM_RANGE];
-    let checksum_sum: i32 = checksum_bytes.iter().cloned().map_into().sum::<i32>();
+    let checksum_sum = checksum_bytes.iter().cloned().map_into().sum::<i32>();
 
     block.iter().cloned().map_into().sum::<i32>()
         // Remove the actual checksum of the checksum bytes
