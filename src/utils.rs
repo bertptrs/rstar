@@ -44,6 +44,25 @@ pub fn parse_size(size: &[u8]) -> Result<usize, ParseIntError> {
     parse_octal(size)
 }
 
+/// Compute the checksum for a given block.
+///
+/// The checksum is simply the sum of all the bytes in the header, where the
+/// checksum bytes are masked with space characters (ASCII 32).
+///
+/// While most programs agree that this should be unsigned, it isn't always,
+/// so this function is generic in order to do both.
+pub fn compute_checksum<T>(block: &[T; 512]) -> i32
+    where T: Into<i32> + Copy {
+    let checksum_bytes = &block[148..156];
+    let checksum_sum: i32 = checksum_bytes.iter().cloned().map_into().sum::<i32>();
+
+    block.iter().cloned().map_into().sum::<i32>()
+        // Remove the actual checksum of the checksum bytes
+        - checksum_sum
+        // And add the 8 spaces, ASCII 32
+        + 32 * 8
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

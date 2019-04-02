@@ -3,11 +3,13 @@ use std::ffi::OsString;
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
+use std::mem::transmute;
 use std::num::ParseIntError;
 
 use utils::parse_octal;
 use utils::parse_size;
-use crate::utils::trimmed_osstr;
+
+use crate::utils::{compute_checksum, trimmed_osstr};
 
 mod utils;
 
@@ -75,6 +77,25 @@ pub struct TarHeader {
 }
 
 impl TarHeader {
+    /// Check to see if the header checksum is correct.
+    ///
+    /// This method checks both the signed and unsigned checksum, and accepts either.
+    pub fn validate_checksum(block: &TarBlock) -> bool {
+        let checksum: i32 = if let Ok(n) = parse_octal(&block[148..156]) {
+            n
+        } else {
+            return false;
+        };
+
+        if checksum == compute_checksum(block) {
+            true
+        } else {
+            // Some implementations have the checksum signed, so just try that as well.
+            let signed_block = unsafe { transmute::<_, &[i8; 512]>(block) };
+            checksum == compute_checksum(signed_block)
+        }
+    }
+
     pub fn from_v7_header(block: &TarBlock) -> Result<TarHeader, TarError> {
         Ok(TarHeader {
             name: trimmed_osstr(&block[0..100]).ok_or(TarError::EncodingError)?.to_owned(),
@@ -103,5 +124,13 @@ mod tests {
 
         let header = TarHeader::from_v7_header(&block).unwrap();
         assert_eq!(LinkType::Normal, header.link);
+    }
+
+    #[test]
+    fn test_checksum() {
+        let mut block = [0u8; 512];
+        block.copy_from_slice(&SAMPLE_DATA[..512]);
+
+        assert_eq!(true, TarHeader::validate_checksum(&block));
     }
 }
