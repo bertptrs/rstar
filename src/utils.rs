@@ -7,6 +7,8 @@ use std::usize;
 use itertools::Itertools;
 use num::Num;
 
+use crate::constants::header::CHECKSUM_RANGE;
+
 /// Create an &str from a null-terminated string.
 ///
 /// Any failures will result in None being returned.
@@ -35,7 +37,7 @@ pub fn trimmed_osstr(contents: &[u8]) -> Option<&OsStr> {
 
 pub fn parse_octal<T>(size: &[u8]) -> Result<T, T::FromStrRadixErr>
     where T: Num {
-    T::from_str_radix(trimmed_str(size).unwrap(), 8)
+    T::from_str_radix(trimmed_str(size).unwrap_or(""), 8)
 }
 
 pub fn parse_size(size: &[u8]) -> Result<usize, ParseIntError> {
@@ -53,7 +55,7 @@ pub fn parse_size(size: &[u8]) -> Result<usize, ParseIntError> {
 /// so this function is generic in order to do both.
 pub fn compute_checksum<T>(block: &[T; 512]) -> i32
     where T: Into<i32> + Copy {
-    let checksum_bytes = &block[148..156];
+    let checksum_bytes = &block[CHECKSUM_RANGE];
     let checksum_sum: i32 = checksum_bytes.iter().cloned().map_into().sum::<i32>();
 
     block.iter().cloned().map_into().sum::<i32>()

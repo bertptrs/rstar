@@ -3,17 +3,18 @@ use std::ffi::OsString;
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::mem::transmute;
+use std::mem::{size_of, transmute};
 use std::num::ParseIntError;
 
 use utils::parse_octal;
 use utils::parse_size;
 
+use crate::constants::header::{CHECKSUM_RANGE, NAME_RANGE, MODE_RANGE, OWNER_RANGE, GROUP_RANGE, SIZE_RANGE, MTIME_RANGE, LINK_TYPE_OFFSET, LINK_NAME_RANGE};
+use crate::constants::TarBlock;
 use crate::utils::{compute_checksum, trimmed_osstr};
 
+pub mod constants;
 mod utils;
-
-type TarBlock = [u8; 512];
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum LinkType {
@@ -40,6 +41,7 @@ impl LinkType {
 pub enum TarError {
     CheckSum,
     EncodingError,
+    EmptyName,
     ParseError(ParseIntError),
 }
 
@@ -81,7 +83,7 @@ impl TarHeader {
     ///
     /// This method checks both the signed and unsigned checksum, and accepts either.
     pub fn validate_checksum(block: &TarBlock) -> bool {
-        let checksum: i32 = if let Ok(n) = parse_octal(&block[148..156]) {
+        let checksum: i32 = if let Ok(n) = parse_octal(&block[CHECKSUM_RANGE]) {
             n
         } else {
             return false;
@@ -91,21 +93,21 @@ impl TarHeader {
             true
         } else {
             // Some implementations have the checksum signed, so just try that as well.
-            let signed_block = unsafe { transmute::<_, &[i8; 512]>(block) };
+            let signed_block = unsafe { transmute::<_, &[i8; size_of::<TarBlock>()]>(block) };
             checksum == compute_checksum(signed_block)
         }
     }
 
     pub fn from_v7_header(block: &TarBlock) -> Result<TarHeader, TarError> {
         Ok(TarHeader {
-            name: trimmed_osstr(&block[0..100]).ok_or(TarError::EncodingError)?.to_owned(),
-            mode: parse_octal(&block[100..108])?,
-            owner: parse_octal(&block[108..116])?,
-            group: parse_octal(&block[108..116])?,
-            size: parse_size(&block[124..136])?,
-            mtime: parse_octal(&block[136..148])?,
-            link: LinkType::from_byte(block[156]),
-            link_name: trimmed_osstr(&block[157..257]).map(|x| x.to_owned()),
+            name: trimmed_osstr(&block[NAME_RANGE]).ok_or(TarError::EmptyName)?.to_owned(),
+            mode: parse_octal(&block[MODE_RANGE])?,
+            owner: parse_octal(&block[OWNER_RANGE])?,
+            group: parse_octal(&block[GROUP_RANGE])?,
+            size: parse_size(&block[SIZE_RANGE])?,
+            mtime: parse_octal(&block[MTIME_RANGE])?,
+            link: LinkType::from_byte(block[LINK_TYPE_OFFSET]),
+            link_name: trimmed_osstr(&block[LINK_NAME_RANGE]).map(|x| x.to_owned()),
         })
     }
 }
